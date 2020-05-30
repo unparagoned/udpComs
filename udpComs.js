@@ -1,4 +1,3 @@
-/* eslint no-use-before-define: ["error", { "functions": false }] */
 
 const dgram = require('dgram');
 const{ exec } = require('child_process');
@@ -17,6 +16,7 @@ if(process.platform === 'win32') {
     process.emit('SIGINT');
   });
 }
+
 process.on('SIGINT', () => {
   // if second signal received close straight away
   if(state === 'closing') process.exit();
@@ -27,6 +27,7 @@ process.on('SIGINT', () => {
   server.close();
 });
 
+
 function debug(statement) {
   if(process.env.DEBUG === '*' || process.env.DEBUG === 'udpComs') {
     console.log(statement);
@@ -34,12 +35,11 @@ function debug(statement) {
 }
 
 const args = process.argv.slice(2);
-
 function getArgs(allArgs, argName) {
   const nameIndex = allArgs.indexOf(argName);
   let argValue = '';
   if(nameIndex >= 0) {
-    argValue = allArgs[nameIndex + 1];
+    [, argValue] = allArgs.splice(nameIndex, 2);
     argValue = (argValue !== undefined ? argValue.replace(/'/g, '') : argValue);
     debug(`"${argName} value is: ${argValue}`);
   }
@@ -48,15 +48,26 @@ function getArgs(allArgs, argName) {
 
 const ipAdd = getArgs(args, '-ip');
 const portNum = (getArgs(args, '-port') || '6868');
-const message = getArgs(args, '-msg');
-const mode = (getArgs(args, '-mode') || (ipAdd && message) ? 'send' : 'server');
-debug(`ip:${ipAdd}\nport:${portNum}\nmsg${message}\nmode:${mode}`);
+let mode = getArgs(args, '-mode');
+const message = args;
+mode = (mode || (ipAdd && message.length) ? 'send' : 'server');
 const startTimes = [Date.now()];
+
+function actionMessage(data) {
+  if(typeof (data) !== 'undefined') {
+    Object.keys(data).forEach((cmd) => {
+      if(cmd === 'nircmd') {
+        console.log(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
+        exec(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
+      }
+    });
+  }
+}
 
 server.on('close', () => {
   if(state === 'closing') {
     process.exit();
-  } else{
+  } else {
     server = dgram.createSocket('udp4');
     startComs();
   }
@@ -70,35 +81,31 @@ server.on('error', (err) => {
 });
 
 function sendMessage(ip, port, cmd) {
-  try{
+  try {
+    debug(`Sending ${cmd} to ${ip}:${port}`);
     const data = {};
     data[cmd.shift()] = cmd;
     const msg = Parser.encode({ data, commandByte: 2 });
     server.send(msg, port, ip, (err, bytes) => {
-      console.log('Message sent');
-      debug(`Msg:${bytes}\nlength:${bytes}\raw${msg}`);
-      if(err) console.error(`Error ${err}`);
+      if(err) {
+        console.error(`Error: ${err}`);
+        state = 'retrying';
+      } else {
+        console.log('Message sent');
+        debug(`Msg:${bytes}\nLength:${bytes}\nRaw:${msg}`);
+        state = 'closing';
+      }
+      server.close();
     });
   } catch(error) {
     console.error(`Error with parsing message: ${error}`);
   }
 }
 
-function actionMessage(data) {
-  if(typeof (data) !== 'undefined') {
-    Object.keys(data).forEach((cmd) => {
-      if(cmd === 'nircmd') {
-        console.log(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
-        exec(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
-      }
-    });
-  }
-}
-
 function listenMessages(port) {
   server.on('message', (msg, rinfo) => {
     debug(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
-    try{
+    try {
       const packet = Parser.parse(msg);
       actionMessage(packet.data);
     } catch(error) {
@@ -122,7 +129,7 @@ function startComs(rate = 2) {
       rate *= rate;
       debug(`Timeout set to ${rate * 1000}`);
       setTimeout(startComs, rate * 1000, rate);
-    } else{
+    } else {
       console.log('Error unable to send');
     }
   } else if(mode === 'server') listenMessages(portNum);
