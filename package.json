@@ -1,0 +1,11 @@
+{
+  "name": "udpcoms",
+  "version": "1.0.0",
+  "description": "",
+  "main": "udpComs.js",
+  "scripts": {
+    "test": "server"
+  },
+  "author": "",
+  "license": "ISC"
+}
