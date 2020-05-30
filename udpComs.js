@@ -1,10 +1,12 @@
 
 const dgram = require('dgram');
 const{ exec } = require('child_process');
+const fs = require('fs');
 const Parser = require('./lib/message-parser');
 
 let server = dgram.createSocket('udp4');
 let state = 'started';
+const config ='cmds.config'
 
 if(process.platform === 'win32') {
   const rl = require('readline').createInterface({
@@ -40,7 +42,7 @@ function getArgs(allArgs, argName) {
   let argValue = '';
   if(nameIndex >= 0) {
     [, argValue] = allArgs.splice(nameIndex, 2);
-    argValue = (argValue !== undefined ? argValue.replace(/'/g, '') : argValue);
+    argValue = (argValue !== 'undefined' ? argValue.replace(/'/g, '') : argValue);
     debug(`"${argName} value is: ${argValue}`);
   }
   return argValue;
@@ -48,17 +50,34 @@ function getArgs(allArgs, argName) {
 
 const ipAdd = getArgs(args, '-ip');
 const portNum = (getArgs(args, '-port') || '6868');
+let runCmds = {};
+try {
+  runCmds = JSON.parse(fs.readFileSync('cmds.config', 'utf8'));
+} catch(err) {
+  debug(`No config file or unable to parse ${config}\n${err}`);
+}
+if(typeof(runCmds) === 'udefined') runCmds = {};
+getArgs(args, '-cmd').split(',').forEach((action) => {
+  const cmd = action.split(':');
+  runCmds[cmd[0]] = cmd[1];
+});
 let mode = getArgs(args, '-mode');
 const message = args;
 mode = (mode || (ipAdd && message.length) ? 'send' : 'server');
+if(mode === 'server') debug(`Active commands ${runCmds}`);
 const startTimes = [Date.now()];
 
 function actionMessage(data) {
-  if(typeof (data) !== 'undefined') {
+  if(data) {
     Object.keys(data).forEach((cmd) => {
+      const run = runCmds[cmd];
+      if(run) {
+        console.log(`Running: ${run} ${data[cmd].join(' ')}`);
+        exec(`${run} ${data[cmd].join(' ')}`);
+      }
       if(cmd === 'nircmd') {
-        console.log(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
-        exec(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
+        //console.log(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
+        //exec(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
       }
     });
   }

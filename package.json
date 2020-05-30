@@ -1,6 +1,6 @@
 {
   "name": "udpcoms",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sends and receives messages over udp",
   "main": "udpComs.js",
   "scripts": {
@@ -12,5 +12,18 @@
     "eslint": "^7.1.0",
     "eslint-config-airbnb-base": "^14.1.0",
     "eslint-plugin-import": "^2.20.2"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unparagoned/udpComs.git"
+  },
+  "keywords": [
+    "udp",
+    "send",
+    "command"
+  ],
+  "bugs": {
+    "url": "https://github.com/unparagoned/udpComs/issues"
+  },
+  "homepage": "https://github.com/unparagoned/udpComs#readme"
 }

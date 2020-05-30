@@ -13,6 +13,7 @@ module.exports = {
         else: { after: true, before: true },
       },
     }],
-    'no-use-before-define': ['error', { functions: false }],
+    'no-use-before-define': ['error', {functions: false}],
+    'prefer-destructuring': false,
   },
 };
