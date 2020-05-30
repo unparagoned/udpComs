@@ -1,12 +1,12 @@
 {
   "name": "udpcoms",
   "version": "1.0.0",
-  "description": "",
+  "description": "Sends and receives messages over udp",
   "main": "udpComs.js",
   "scripts": {
-    "test": "server"
+    "test": "node udpComs -ip 127.0.0.1 -port 6789 Hey"
   },
-  "author": "",
+  "author": "Unparagoned",
   "license": "ISC",
   "devDependencies": {
     "eslint": "^7.1.0",
