@@ -67,10 +67,13 @@ getArgs(args, 'cmds', config).split(',').forEach((action) => {
 });
 
 const ipAdd = getArgs(args, 'ip', config);
-const portNum = (getArgs(args, 'port', config) || '6868');
+const portNum = (getArgs(args, 'port', config) || '6789');
+let retries = getArgs(args, 'retries', config);
+retries = (Number.isInteger(retries) ? retries : 10);
 let mode = getArgs(args, 'mode', config);
 const message = args;
 mode = (mode || (ipAdd && message.length) ? 'send' : 'server');
+debug(`ip:${ipAdd}\nport:${portNum}\nmsg${message}\nmode:${mode}\nretires:${retries}`);
 if(mode === 'server') debug(`Active commands ${JSON.stringify(runCmds)}`);
 const startTimes = [Date.now()];
 
@@ -82,7 +85,7 @@ function actionMessage(data) {
         console.log(`Running: ${run} ${data[cmd].join(' ')}`);
         exec(`${run} ${data[cmd].join(' ')}`);
       } else {
-        debug(`Command name ${cmd} not in ${JSON.stringify(runCmds)}`);
+        console.log(`Command name ${cmd} not in ${JSON.stringify(runCmds)}`);
       }
     });
   }
@@ -91,8 +94,8 @@ function actionMessage(data) {
 function setupServer() {
   server = dgram.createSocket('udp4');
   server.on('close', () => {
-    debug('server closed');
-    if(state === 'closing') {
+    debug(`server closed\nRetires remainting ${retries}`);
+    if(state === 'closing' || retries === 0) {
       process.exit();
     } else {
       setupServer();
@@ -100,18 +103,20 @@ function setupServer() {
     }
   });
   server.on('error', (err) => {
-    console.log(`server error:\n${err.stack}`);
+    console.error(`server error:\n${err}`);
+    if(err.code === 'EADDRINUSE') {
+      console.error('The Port is in use, maybe this program is already running or another program is using that port');
+    }
     server.close();
   });
 }
-
 
 function sendMessage(ip, port, cmd) {
   try {
     debug(`Sending ${cmd} to ${ip}:${port}`);
     const data = {};
     data[cmd.shift()] = cmd;
-    const msg = Parser.encode({ data, commandByte: 2 });
+    const msg = (mode === 'raw' ? cmd : Parser.encode({ data, commandByte: 2 }));
     server.send(msg, port, ip, (err, bytes) => {
       if(err) {
         console.error(`Error: ${err}`);
@@ -136,7 +141,7 @@ function listenMessages(port) {
       const packet = Parser.parse(msg);
       actionMessage(packet.data);
     } catch(error) {
-      console.log(`Error in parsing input:${error}`);
+      console.error(`Error in parsing input:${error}`);
     }
   });
   server.on('listening', () => {
@@ -147,20 +152,20 @@ function listenMessages(port) {
 }
 
 function startComs(rate = 2) {
-  debug('Starting udpcoms');
   startTimes.push(Date.now());
   const startCount = startTimes.filter((time) => time > Date.now() - rate * rate * 1000).length - 1;
   if(startCount > rate) {
-    debug(`Rate limit exceeded, ${startCount} restarts in ${rate} seconds`);
+    console.warn(`Rate limit exceeded, ${startCount} restarts in ${rate} seconds`);
     if(mode === 'server') {
       // eslint-disable-next-line no-param-reassign
       rate *= rate;
-      debug(`Timeout set to ${rate * 1000}`);
+      console.log(`Trying againt in ${rate} seconds`);
       setTimeout(startComs, rate * 1000, rate);
     } else {
       console.log('Error unable to send');
     }
   } else {
+    retries -= 1;
     setupServer();
     if(mode === 'server') listenMessages(portNum);
     else sendMessage(ipAdd, portNum, message);
