@@ -1,4 +1,6 @@
 
+/* eslint no-param-reassign: ["error", { "props": true, "ignorePropertyModificationsFor": ["conf"] }] */
+
 const dgram = require('dgram');
 const{ exec } = require('child_process');
 const fs = require('fs');
@@ -6,7 +8,7 @@ const Parser = require('./lib/message-parser');
 
 let server = dgram.createSocket('udp4');
 let state = 'started';
-const config ='cmds.config'
+const configFile = 'cmds.config';
 
 if(process.platform === 'win32') {
   const rl = require('readline').createInterface({
@@ -29,7 +31,6 @@ process.on('SIGINT', () => {
   server.close();
 });
 
-
 function debug(statement) {
   if(process.env.DEBUG === '*' || process.env.DEBUG === 'udpComs') {
     console.log(statement);
@@ -37,67 +38,73 @@ function debug(statement) {
 }
 
 const args = process.argv.slice(2);
-function getArgs(allArgs, argName) {
-  const nameIndex = allArgs.indexOf(argName);
-  let argValue = '';
+
+function getArgs(allArgs, argName, conf) {
+  const nameIndex = allArgs.indexOf(`-${argName}`);
+  let argValue;
   if(nameIndex >= 0) {
     [, argValue] = allArgs.splice(nameIndex, 2);
-    argValue = (argValue !== 'undefined' ? argValue.replace(/'/g, '') : argValue);
+    argValue = (typeof (argValue) !== 'undefined' ? argValue.replace(/'/g, '') : argValue);
     debug(`"${argName} value is: ${argValue}`);
+  } else if(conf) {
+    argValue = conf[argName];
+    delete conf[argName];
   }
-  return argValue;
+  return(typeof (argValue) !== 'undefined' ? argValue : '');
 }
 
-const ipAdd = getArgs(args, '-ip');
-const portNum = (getArgs(args, '-port') || '6868');
-let runCmds = {};
+let config = '';
 try {
-  runCmds = JSON.parse(fs.readFileSync('cmds.config', 'utf8'));
+  config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 } catch(err) {
-  debug(`No config file or unable to parse ${config}\n${err}`);
+  debug(`No config file or unable to parse ${configFile}\n${err}`);
 }
-if(typeof(runCmds) === 'udefined') runCmds = {};
-getArgs(args, '-cmd').split(',').forEach((action) => {
+const runCmds = (Object.keys(config).length ? config : {});
+
+getArgs(args, 'cmds', config).split(',').forEach((action) => {
   const cmd = action.split(':');
   runCmds[cmd[0]] = cmd[1];
 });
-let mode = getArgs(args, '-mode');
+
+const ipAdd = getArgs(args, 'ip', config);
+const portNum = (getArgs(args, 'port', config) || '6868');
+let mode = getArgs(args, 'mode', config);
 const message = args;
 mode = (mode || (ipAdd && message.length) ? 'send' : 'server');
-if(mode === 'server') debug(`Active commands ${runCmds}`);
+if(mode === 'server') debug(`Active commands ${JSON.stringify(runCmds)}`);
 const startTimes = [Date.now()];
 
 function actionMessage(data) {
-  if(data) {
+  if(typeof (data) !== 'undefined') {
     Object.keys(data).forEach((cmd) => {
       const run = runCmds[cmd];
       if(run) {
         console.log(`Running: ${run} ${data[cmd].join(' ')}`);
         exec(`${run} ${data[cmd].join(' ')}`);
-      }
-      if(cmd === 'nircmd') {
-        //console.log(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
-        //exec(`/mnt/c/windows/nircmd.exe ${data[cmd].join(' ')}`);
+      } else {
+        debug(`Command name ${cmd} not in ${JSON.stringify(runCmds)}`);
       }
     });
   }
 }
 
-server.on('close', () => {
-  if(state === 'closing') {
-    process.exit();
-  } else {
-    server = dgram.createSocket('udp4');
-    startComs();
-  }
-});
-
-server.on('error', (err) => {
-  console.log(`server error:\n${err.stack}`);
-  server.close();
+function setupServer() {
   server = dgram.createSocket('udp4');
-  startComs();
-});
+  server.on('close', () => {
+    debug('server closed');
+    if(state === 'closing') {
+      process.exit();
+    } else {
+      setupServer();
+      startComs();
+    }
+  });
+  server.on('error', (err) => {
+    console.log(`server error:\n${err.stack}`);
+    server.close();
+  });
+}
+
 
 function sendMessage(ip, port, cmd) {
   try {
@@ -122,6 +129,7 @@ function sendMessage(ip, port, cmd) {
 }
 
 function listenMessages(port) {
+  debug('starting server');
   server.on('message', (msg, rinfo) => {
     debug(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
     try {
@@ -139,8 +147,9 @@ function listenMessages(port) {
 }
 
 function startComs(rate = 2) {
+  debug('Starting udpcoms');
   startTimes.push(Date.now());
-  const startCount = startTimes.filter((time) => time > Date.now() - rate * rate * 1000).length;
+  const startCount = startTimes.filter((time) => time > Date.now() - rate * rate * 1000).length - 1;
   if(startCount > rate) {
     debug(`Rate limit exceeded, ${startCount} restarts in ${rate} seconds`);
     if(mode === 'server') {
@@ -151,7 +160,10 @@ function startComs(rate = 2) {
     } else {
       console.log('Error unable to send');
     }
-  } else if(mode === 'server') listenMessages(portNum);
-  else sendMessage(ipAdd, portNum, message);
+  } else {
+    setupServer();
+    if(mode === 'server') listenMessages(portNum);
+    else sendMessage(ipAdd, portNum, message);
+  }
 }
 startComs();
