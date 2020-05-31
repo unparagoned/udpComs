@@ -15,5 +15,6 @@ module.exports = {
     }],
     'no-use-before-define': ['error', { functions: false }],
     'prefer-destructuring': 0,
+    'arrow-parens': ['error', 'as-needed'],
   },
 };

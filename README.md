@@ -9,7 +9,7 @@ If using a config file and deafults you can simply run
 
 If you are specifying commands at runtime and port run
 
-```node udpComs -port 6868 -cmd pad:notepoad,nircmd:/mnt/c/windows/nircmd.exe```
+```node udpComs -port 6868 -mode server -cmds pad:notepoad,nircmd:/mnt/c/windows/nircmd.exe```
 
 The cmd arguments should be the command name and command/program path seperated by a colon ```cmdName:path``` and multiple commands seperated by commas.
 
@@ -19,7 +19,7 @@ Send a message with
 ```node udpcoms -ip 192.169.x.x cmdName optionalArgs```
 
 e.g.
-```node udpcoms -ip 192.169.x.x nircmd changesysvolume +10000```
+```node udpcoms -ip 192.169.x.x -mode sendnircmd changesysvolume +10000```
 
 ### Config
 Using a cmds.config file to save common setting for server
@@ -32,3 +32,10 @@ Using a cmds.config file to save common setting for server
   "port": "6789"
 }
 '''
+
+## Troubleshooting
+Run in debug mode.
+
+Linux```DEBUG=* node udpcoms```
+
+Windows```set DEBUG=* & node udpcoms```
