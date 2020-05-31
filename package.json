@@ -2,9 +2,9 @@
   "name": "udpcoms",
   "version": "1.0.2",
   "description": "Sends and receives messages over udp",
-  "main": "udpComs.js",
+  "main": "udpcoms.js",
   "scripts": {
-    "test": "node udpComs -ip 127.0.0.1 -port 6789 pad:notepad"
+    "test": "node udpcoms -ip 127.0.0.1 -port 6789 pad:notepad"
   },
   "author": "Unparagoned",
   "license": "ISC",

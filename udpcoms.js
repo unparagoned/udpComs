@@ -5,17 +5,13 @@ const fs = require('fs');
 
 let server = dgram.createSocket('udp4');
 let state = 'started';
+const configFile = `${__dirname}/cmds.config`;
 
 const db = ['*', 'updComs'].indexOf((process.env.DEBUG || '').trim()) >= 0;
 const debug = (db) ? statement => console.log(statement) : statement => statement;
 const errorTimeout = 3 * 1000;
 
-const wslPath = path => path.replace(/\\/g, '/').replace(/([A-Za-z]):/, '/mnt/$1').toLowerCase();
-const winPath = path => path.replace(/\/mnt\/([a-z])/, '$1:');
-let pathConv = wslPath;
-
 if(process.platform === 'win32') {
-  pathConv = winPath;
   const rl = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -26,6 +22,10 @@ if(process.platform === 'win32') {
   });
 }
 
+function closeServer() {
+  console.log('Timeout');
+  server.close();
+}
 process.on('SIGINT', () => {
   // if second signal received close straight away
   debug(`SIGINT received. Program state ${state}`);
@@ -37,59 +37,45 @@ process.on('SIGINT', () => {
   server.close();
 });
 
-function closeServer() {
-  console.log('Timeout');
-  server.close();
-}
-
 const args = process.argv.slice(2);
 let config = '';
 
-const configFile = `${__dirname}/udpcoms.json`;
+function getArgs(allArgs, argName) {
+  const nameIndex = allArgs.indexOf(`-${argName}`);
+  let argValue;
+  if(config) {
+    argValue = config[argName];
+    delete config[argName];
+  }
+  if(nameIndex >= 0) {
+    [, argValue] = allArgs.splice(nameIndex, 2);
+    argValue = (typeof (argValue) !== 'undefined' ? argValue.replace(/'/g, '') : argValue);
+    debug(`"${argName} value is: ${argValue}`);
+  }
+  return(typeof (argValue) !== 'undefined' ? argValue : '');
+}
+
 try {
   config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 } catch(err) {
   debug(`No config file or unable to parse ${configFile}\n${err}`);
 }
 
-function getArgs(allArgs, argName) {
-  const nameIndex = allArgs.indexOf(`-${argName}`);
-  let argValue;
-  if(nameIndex >= 0) [, argValue] = allArgs.splice(nameIndex, 2);
-  if(config) {
-    argValue = (argValue || config[argName]);
-    delete config[argName];
-  }
-  if(argValue) debug(`From args: "${argName} value is: ${argValue}`);
-  argValue = (typeof argValue === 'string') ? argValue.replace(/'/g, '') : argValue;
-  return(typeof argValue === 'undefined' ? '' : argValue);
-}
-
 let ipAdd = getArgs(args, 'ip');
-const portNumber = Number(getArgs(args, 'port')) || 6789;
-let retries = Number(getArgs(args, 'retries')) || 10;
+const portNum = Number(getArgs(args, 'port') || 6789);
+let retries = (parseInt(getArgs(args, 'retries'), 10) || 10);
 let mode = getArgs(args, 'mode');
-pathConv = String(getArgs(args, 'conv')).toLocaleLowerCase() === 'false' ? path => path : pathConv;
-let runCmds = Object.keys(config).length ? config : {};
-
+let runCmds = (Object.keys(config).length ? config : {});
 
 getArgs(args, 'cmds').split(',').forEach(action => {
-  const[cmd, ...path] = action.split(':');
-  if(cmd) runCmds[cmd] = path.join(':');
+  const cmd = action.split(':');
+  if(cmd[0]) runCmds[cmd[0]] = cmd[1];
 });
 
 const message = args;
 mode = (mode || ((ipAdd && message.length) ? 'send' : 'server'));
-
-const serverPort = (mode === 'server') ? portNumber : portNumber + 1;
-const sendPort = (mode === 'server') ? portNumber + 1 : portNumber;
-
-
-debug(`ip:${ipAdd}\nports:${sendPort}/${serverPort}\nmsg${message}\nmode:${mode}\nretires:${retries}`);
-
-Object.entries(runCmds).forEach(([cmd, path]) => {
-  runCmds[cmd] = pathConv(path);
-});
+const serverPort = (mode === 'server' ? portNum : portNum + 1);
+debug(`ip:${ipAdd}\nport:${portNum}\nmsg${message}\nmode:${mode}\nretires:${retries}`);
 
 if(mode === 'server') debug(`Active commands ${JSON.stringify(runCmds)}`);
 else runCmds = {};
@@ -110,7 +96,8 @@ function parseMsg(packet) {
     console.error(`Pre: ${msg.readUInt32BE(0)} \nPost: ${msg.readUInt32BE(msg.length - 4)}`);
     if(!db)return'';
   }
-  msg = msg.slice(8, msg.length - 8);
+  msg = msg.slice(0, msg.length - 8);
+  msg = msg.slice(8);
   return JSON.parse(msg);
 }
 
@@ -132,13 +119,13 @@ function actionMessage(data) {
             debug(stdout);
             debug(stderr);
             const result = ['result', { stdout, stderr, error }];
-            if(!db && error) setTimeout(sendMessage, errorTimeout, ipAdd, sendPort, ['result', { Error: 'Error' }]);
-            else sendMessage(ipAdd, sendPort, result);
+            if(!db && error) setTimeout(sendMessage, errorTimeout, ipAdd, portNum + 1, ['result', { Error: 'Error' }]);
+            else sendMessage(ipAdd, portNum + 1, result);
           });
         } else {
           console.log(`Command name ${cmd} not in ${JSON.stringify(runCmds)}`);
-          if(db) sendMessage(ipAdd, sendPort, ['result', { Error: `Command name ${cmd} not in ${JSON.stringify(runCmds)}` }]);
-          else setTimeout(sendMessage, errorTimeout, ipAdd, sendPort, ['result', { Error: 'Error' }]);
+          if(db) sendMessage(ipAdd, portNum + 1, ['result', { Error: `Command name ${cmd} not in ${JSON.stringify(runCmds)}` }]);
+          else setTimeout(sendMessage, errorTimeout, ipAdd, portNum + 1, ['result', { Error: 'Error' }]);
         }
       });
     }
@@ -171,8 +158,13 @@ function sendMessage(ip, port, cmd) {
   try {
     debug(`Sending ${cmd} to ${ip}:${port}`);
     const data = {};
+    let msg;
     data[cmd.shift()] = cmd;
-    const msg = formatMsg({ data });
+    msg = formatMsg({ data });
+    console.log(msg);
+    if(mode !== 'raw') {
+      // msg = Parser.encode({data, commandByte: 2});
+    }
     debug(`Msg is:${msg}\nLength:${cmd.length}`);
     server.send(msg, port, ip, (err, bytes) => {
       if(err) {
@@ -189,7 +181,6 @@ function sendMessage(ip, port, cmd) {
     });
   } catch(error) {
     console.error(`Error with parsing message: ${error}`);
-    server.close();
   }
 }
 
@@ -198,6 +189,7 @@ function listenMessages(port) {
   server.on('message', (msg, rinfo) => {
     debug(`server received: ${msg} from ${rinfo.address}:${rinfo.port}`);
     ipAdd = rinfo.address;
+    debug(`msg length ${msg.length}`);
     try {
       const packet = parseMsg(msg);
       actionMessage(packet.data);
@@ -234,14 +226,12 @@ function startComs(rate = 2) {
       setTimeout(startComs, rate * 1000, rate);
     } else {
       console.log('Error unable to send');
-      state = 'closing';
-      server.close();
     }
   } else {
     retries -= 1;
     setupServer();
     listenMessages(serverPort);
-    if(mode !== 'server') sendMessage(ipAdd, sendPort, message);
+    if(mode !== 'server') sendMessage(ipAdd, portNum, message);
   }
 }
 startComs();
