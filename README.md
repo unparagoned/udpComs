@@ -24,13 +24,14 @@ Send a message with
 ```node udpcoms -ip 192.169.x.x cmdName optionalArgs```
 
 e.g.
+
 ```node udpcoms -ip 192.169.x.x -mode sendnircmd changesysvolume +10000```
 
 ### Config
 
-Using a udpcoms.json file to save common setting for server
+Using config.json file to save common setting for server
 
-'''
+```
 {
   "spotify": "C:/Users/unpar/AppData/Roaming/Spotify/Spotify.exe",
   "nircmd": "/mnt/c/windows/nircmd.exe",
@@ -38,31 +39,30 @@ Using a udpcoms.json file to save common setting for server
   "pad": "pad",
   "port": "6789"
 }
-'''
+```
 
 ### Examples
 
 Control you computer using programs like nircmd
-'''
+```
 node udpcoms -cmds nircmd:c:/windows/nircmd.exe
 node udpcoms -ip 192.168.x.x power C:/Users/user/script.ps1 script args /mnt/c/windows/nircmd.exe
-
-'''
+```
 
 Run scripts
-'''
+```
 node udpcoms -cmds bash:powershell
 node udpcoms -ip 192.168.x.x power C:/Users/user/script.ps1 script args
-''''
+```
 
 Start programs
-'''
+```
 node udpcoms -cmds spot:C:/Users/unpar/AppData/Roaming/Spotify/Spotify.exe,power:powershell
 node udpcoms -ip 192.168.x.x spot
-''''
+```
 
 Logout of your PC remotely
-'''
+```
 node udpcoms -cmds power:powershell
 node updcoms -ip 192.168.x.x power shutdown /l
 
@@ -77,6 +77,6 @@ node updcoms -ip 192.168.x.x power Get-Item -Path .\file.txt
 
 Run in debug mode.
 
-Linux```DEBUG=* node udpcoms```
+Linux ```DEBUG=* node udpcoms```
 
-Windows```set DEBUG=* & node udpcoms```
+Windows ```set DEBUG=* & node udpcoms```
