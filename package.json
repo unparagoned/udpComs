@@ -1,6 +1,6 @@
 {
   "name": "udpcoms",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Sends and receives messages over udp",
   "main": "udpcoms.js",
   "scripts": {
@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/unparagoned/udpComs.git"
+    "url": "git+https://github.com/unparagoned/udpcoms.git"
   },
   "keywords": [
     "udp",
@@ -23,7 +23,7 @@
     "command"
   ],
   "bugs": {
-    "url": "https://github.com/unparagoned/udpComs/issues"
+    "url": "https://github.com/unparagoned/udpcoms/issues"
   },
-  "homepage": "https://github.com/unparagoned/udpComs#readme"
+  "homepage": "https://github.com/unparagoned/udpcoms#readme"
 }
