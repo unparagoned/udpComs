@@ -45,7 +45,7 @@ function closeServer() {
 const args = process.argv.slice(2);
 let config = '';
 
-const configFile = `${__dirname}/udpcoms.json`;
+const configFile = `${__dirname}/config.json`;
 try {
   config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 } catch(err) {

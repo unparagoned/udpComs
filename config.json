@@ -1,0 +1,7 @@
+{
+  "write": "c:/windwows/write.exe",
+  "paint": "c:\\windows\\system32\\mspaint.exe",
+  "nircmd-wsl": "/mnt/c/windows/nircmd.exe",
+  "pad": "notepad",
+  "port": 6789
+}

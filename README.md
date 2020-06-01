@@ -69,7 +69,7 @@ node updcoms -ip 192.168.x.x power shutdown /l
 ```
 Read files
 '''
-node udpcoms -cmds power:powershell 
+node udpcoms -cmds power:powershell
 node updcoms -ip 192.168.x.x power Get-Item -Path .\file.txt
 '''
 
